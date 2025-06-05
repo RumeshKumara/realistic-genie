@@ -80,14 +80,23 @@ export default function InterviewSetup() {
         throw new Error('Please fill in all interview details');
       }
 
-      // Extract just the number from experience level
-      const experienceLevel = interviewData.yearsOfExperience.split(' ')[0];
+      console.log('Interview Data:', {
+        role: interviewData.jobRole,
+        experience: interviewData.yearsOfExperience
+      });
+
+      // Extract the numeric value and convert to string
+      const experienceLevel = String(parseInt(interviewData.yearsOfExperience));
+      
+      console.log('Parsed experience level:', experienceLevel);
 
       const generatedQuestions = await generateInterviewQuestions(
         interviewData.jobRole,
         5, // number of questions
         experienceLevel
       );
+
+      console.log('Generated Questions:', generatedQuestions);
 
       if (!Array.isArray(generatedQuestions) || generatedQuestions.length === 0) {
         throw new Error('No questions were generated. Please try again.');
@@ -146,7 +155,7 @@ export default function InterviewSetup() {
           <Card className="order-2 p-6 lg:order-2">
             <div className="space-y-4">
               <h2 className="text-xl font-semibold">Camera Preview</h2>
-              <div className="relative overflow-hidden rounded-lg aspect-video bg-[#361161]">
+              <div className="relative overflow-hidden rounded-lg aspect-video border-r border-t border-l-2 border-b-2 border-purple-500 bg-[#f6f0ff] dark:bg-[#0d0d0e]">
                 {hasWebcam ? (
                   <Webcam
                     ref={webcamRef}
@@ -156,7 +165,7 @@ export default function InterviewSetup() {
                   />
                 ) : (
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <AlertCircle className="w-12 h-12 text-[#6f24b4]" />
+                    <AlertCircle className="w-12 h-12 text-[#a751f8]" />
                   </div>
                 )}
               </div>

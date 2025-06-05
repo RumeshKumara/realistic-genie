@@ -3,6 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { X, Briefcase, FileText, Clock, Award } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Button from '../ui/Button';
+import { useUser } from '@clerk/clerk-react';
+import { v4 as uuidv4 } from 'uuid';
+import { db } from '../../../utils/db';
+import { MockInterview } from '../../../utils/schema';
+import { genAI } from '../../lib/gemini';
 
 interface NewInterviewModalProps {
   isOpen: boolean;
@@ -61,27 +66,80 @@ export default function NewInterviewModal({ isOpen, onClose }: NewInterviewModal
     yearsOfExperience: '',
     reasonForInterview: ''
   });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const { user } = useUser();
+
+  const generateAIResponse = async (prompt: string) => {
+    try {
+      const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+      
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      const text = response.text();
+      
+      // Validate JSON structure
+      const parsed = JSON.parse(text);
+      if (!Array.isArray(parsed.questions)) {
+        throw new Error('Invalid AI response format');
+      }
+      
+      return parsed;
+    } catch (error) {
+      console.error('Error details:', error);
+      throw new Error('Failed to generate questions. Please try again.');
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    
+    try {
+      const prompt = `Create 5 interview questions with answers for the following position:
+        Job Title: ${formData.title}
+        Job Role: ${formData.jobRole}
+        Experience Level: ${formData.yearsOfExperience}
+        Interview Context: ${formData.reasonForInterview}
+        
+        Format the response as JSON with this structure:
+        {
+          "questions": [
+            {
+              "Question": "question text",
+              "Answer": "answer text"
+            }
+          ]
+        }`;
+      
+      const aiResponse = await generateAIResponse(prompt);
+      
+      const newMockId = uuidv4();
+      await db
+        .insert(MockInterview)
+        .values({
+          id: newMockId,
+          jobTitle: formData.title,
+          jobRole: formData.jobRole,
+          yearsOfExperience: formData.yearsOfExperience,
+          reasonForInterview: formData.reasonForInterview,
+          questions: JSON.stringify(aiResponse),
+          createdBy: user?.primaryEmailAddress?.emailAddress || ''
+        });
+      navigate('/interview/questions', { state: { questions: aiResponse.questions } });
+      onClose();
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'An unexpected error occurred');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    // Store interview data in localStorage
-    localStorage.setItem('interviewData', JSON.stringify({
-      ...formData,
-      timestamp: new Date().toISOString()
-    }));
-
-    // Navigate to interview setup
-    navigate('/interview/setup');
-    onClose();
-  };
-
-  
 
   return (
     <AnimatePresence>
@@ -203,12 +261,18 @@ export default function NewInterviewModal({ isOpen, onClose }: NewInterviewModal
                 </Button>
                 <Button
                   type="submit"
-                  disabled={!formData.title || !formData.jobRole || !formData.yearsOfExperience || !formData.reasonForInterview}
+                  disabled={!formData.title || !formData.jobRole || !formData.yearsOfExperience || !formData.reasonForInterview || loading}
                   className="button-hover-effect"
                 >
-                  Start Interview
+                  {loading ? 'Generating...' : 'Start Interview'}
                 </Button>
               </div>
+
+              {error && (
+                <div className="mt-2 text-sm text-red-500">
+                  {error}
+                </div>
+              )}
             </form>
           </motion.div>
         </motion.div>

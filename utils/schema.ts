@@ -1,19 +1,21 @@
 import { 
   pgTable, 
-  serial, 
   text, 
-  varchar, 
-  timestamp 
+  timestamp, 
+  uuid 
 } from 'drizzle-orm/pg-core';
 
-export const mockInterview = pgTable('mock_interview', {
-  id: serial('id').primaryKey(),
-  jsonMockResp: text('json_mock_resp').notNull(),
-  jobTitle: varchar('job_title', { length: 255 }).notNull(),
-  jobRole: varchar('job_role', { length: 255 }).notNull(),
-  yearsOfExperience: varchar('years_of_experience', { length: 50 }).notNull(),
+export const MockInterview = pgTable('mock_interviews', {
+  id: uuid('id').primaryKey(),
+  jobTitle: text('job_title').notNull(),
+  jobRole: text('job_role').notNull(),
+  yearsOfExperience: text('years_of_experience').notNull(),
   reasonForInterview: text('reason_for_interview').notNull(),
-  createdBy: varchar('created_by', { length: 255 }).notNull(),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-  mockId: varchar('mock_id', { length: 255 }).notNull(),
+  questions: text('questions').notNull(),
+  createdBy: text('created_by').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull()
 });
+
+// Add a type export for TypeScript support
+export type MockInterview = typeof MockInterview.$inferSelect;
+export type NewMockInterview = typeof MockInterview.$inferInsert;

@@ -1,60 +1,52 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+// Use VITE_PUBLIC_ prefix for environment variables in Vite projects
+const API_KEY = import.meta.env.VITE_PUBLIC_GEMINI_API_KEY;
 
 if (!API_KEY) {
-  throw new Error('Gemini API key is not configured. Please check your .env file.');
+  console.error('Gemini API key is not configured. Please set VITE_PUBLIC_GEMINI_API_KEY in your environment.');
 }
 
-// Initialize the Gemini AI client
-const genAI = new GoogleGenerativeAI(API_KEY);
+export const genAI = new GoogleGenerativeAI(API_KEY || '');
 
-export async function generateQuestions(jobRole: string, numberOfQuestions: number, experienceLevel: string) {
+export async function generateQuestions(
+  jobRole: string,
+  numQuestions: number,
+  experienceLevel: string
+) {
   try {
+    if (!API_KEY) {
+      throw new Error('Gemini API key is not configured');
+    }
+
+    console.log('Calling Gemini API with:', {
+      jobRole,
+      numQuestions,
+      experienceLevel: experienceLevel.toString()
+    });
+
     const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
 
-    const cleanJobRole = jobRole.trim();
-    const cleanExperience = experienceLevel.trim();
-
-    const prompt = `Generate ${numberOfQuestions} interview questions for a ${cleanJobRole} position with ${cleanExperience} experience level.
-    Format the response as a JSON array with each question object having this structure:
-    {
-      "question": "Technical or behavioral question",
-      "expectedAnswer": "Detailed model answer",
-      "keyPoints": ["Key concept 1", "Key concept 2", "Key concept 3"],
-      "scoringCriteria": {
-        "max": 100,
-        "criteria": ["Evaluation point 1", "Evaluation point 2", "Evaluation point 3"]
-      }
-    }`;
+    const prompt = `Generate ${numQuestions} technical interview questions for a ${jobRole} position with ${experienceLevel} years of experience. 
+    Format the response as a JSON array where each question object has:
+    - question: the interview question
+    - expectedAnswer: detailed expected answer
+    - keyPoints: array of key points to look for
+    - scoringCriteria: object with max score and array of criteria
+    
+    Make questions increasingly difficult and relevant to the experience level.`;
 
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const text = response.text();
-    
+
     try {
-      // Extract JSON from the response
-      const jsonMatch = text.match(/\[[\s\S]*\]/);
-      const jsonStr = jsonMatch ? jsonMatch[0] : text;
-      const parsed = JSON.parse(jsonStr);
-
-      if (!Array.isArray(parsed) || parsed.length === 0) {
-        throw new Error('Invalid response format');
-      }
-
-      // Validate and clean each question object
-      return parsed.map(q => ({
-        question: q.question || 'Question not provided',
-        expectedAnswer: q.expectedAnswer || 'Answer not provided',
-        keyPoints: Array.isArray(q.keyPoints) ? q.keyPoints : [],
-        scoringCriteria: {
-          max: q.scoringCriteria?.max || 100,
-          criteria: Array.isArray(q.scoringCriteria?.criteria) ? q.scoringCriteria.criteria : []
-        }
-      }));
-    } catch (error) {
-      console.error('Failed to parse Gemini response:', text);
-      throw new Error('Invalid response format from AI');
+      const questions = JSON.parse(text);
+      console.log('Parsed questions:', questions);
+      return questions;
+    } catch (parseError) {
+      console.error('Error parsing Gemini response:', parseError);
+      throw new Error('Failed to parse generated questions');
     }
   } catch (error) {
     console.error('Error generating questions:', error);
@@ -62,7 +54,12 @@ export async function generateQuestions(jobRole: string, numberOfQuestions: numb
   }
 }
 
-export async function evaluateAnswer(question: string, answer: string, jobRole: string, experienceLevel: string) {
+export async function evaluateAnswer(
+  question: string,
+  answer: string,
+  jobRole: string,
+  experienceLevel: string
+) {
   try {
     const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
 
@@ -102,7 +99,7 @@ export async function evaluateAnswer(question: string, answer: string, jobRole: 
 
 export async function generateMassiveQuestionSet() {
   try {
-    if (!import.meta.env.VITE_GEMINI_API_KEY) {
+    if (!API_KEY) {
       throw new Error('Gemini API key is not configured');
     }
 
