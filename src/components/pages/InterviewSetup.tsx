@@ -5,7 +5,7 @@ import { Video, Mic, Settings, AlertCircle, ArrowLeft, } from 'lucide-react';
 import Webcam from 'react-webcam';
 import { Card } from '../ui/Card';
 import Button from '../ui/Button';
-import { generateQuestions } from '../../lib/gemini';
+import { generateInterviewQuestions } from '../../lib/interview';
 
 interface Question {
   question: string;
@@ -74,22 +74,40 @@ export default function InterviewSetup() {
   const startInterview = async () => {
     try {
       setIsLoading(true);
-      const generatedQuestions = await generateQuestions(
+      setPermissionError(null);
+
+      if (!interviewData?.jobRole || !interviewData?.yearsOfExperience) {
+        throw new Error('Please fill in all interview details');
+      }
+
+      // Extract just the number from experience level
+      const experienceLevel = interviewData.yearsOfExperience.split(' ')[0];
+
+      const generatedQuestions = await generateInterviewQuestions(
         interviewData.jobRole,
         5, // number of questions
-        interviewData.yearsOfExperience
+        experienceLevel
       );
+
+      if (!Array.isArray(generatedQuestions) || generatedQuestions.length === 0) {
+        throw new Error('No questions were generated. Please try again.');
+      }
+
+      // Store in localStorage as backup
+      localStorage.setItem('currentQuestions', JSON.stringify(generatedQuestions));
       
-      setQuestions(generatedQuestions);
-      navigate('/interview/session', { 
+      navigate('/quiz-session', { 
         state: { 
           questions: generatedQuestions,
           interviewData 
-        }
+        },
+        replace: true
       });
-    } catch (error) {
-      console.error('Failed to start interview:', error);
-      setPermissionError('Failed to generate interview questions. Please try again.');
+    } catch (error: any) {
+      console.error('Interview generation error:', error);
+      setPermissionError(
+        error.message || 'Failed to generate interview questions. Please try again.'
+      );
     } finally {
       setIsLoading(false);
     }
@@ -123,11 +141,12 @@ export default function InterviewSetup() {
           </div>
         </div>
 
-        <Card className="p-6">
-          <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          {/* Camera Preview - Left Side */}
+          <Card className="order-2 p-6 lg:order-2">
             <div className="space-y-4">
               <h2 className="text-xl font-semibold">Camera Preview</h2>
-              <div className="relative overflow-hidden rounded-lg aspect-video bg-black/10">
+              <div className="relative overflow-hidden rounded-lg aspect-video bg-[#361161]">
                 {hasWebcam ? (
                   <Webcam
                     ref={webcamRef}
@@ -137,13 +156,11 @@ export default function InterviewSetup() {
                   />
                 ) : (
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <AlertCircle className="w-12 h-12 text-muted-foreground" />
+                    <AlertCircle className="w-12 h-12 text-[#6f24b4]" />
                   </div>
                 )}
               </div>
-            </div>
 
-            <div className="space-y-6">
               <div className="space-y-4">
                 <h2 className="text-xl font-semibold">Device Settings</h2>
                 <div className="space-y-3">
@@ -175,7 +192,6 @@ export default function InterviewSetup() {
                       {micEnabled ? 'Enabled' : 'Disabled'}
                     </Button>
                   </div>
-                  
                 </div>
               </div>
 
@@ -188,6 +204,14 @@ export default function InterviewSetup() {
                   <Settings className="w-4 h-4" />
                   Check Devices
                 </Button>
+                {permissionError && (
+                  <div className="p-3 text-sm text-red-500 rounded-md bg-red-50">
+                    <div className="flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4" />
+                      {permissionError}
+                    </div>
+                  </div>
+                )}
                 <Button
                   onClick={startInterview}
                   className="w-full"
@@ -197,8 +221,54 @@ export default function InterviewSetup() {
                 </Button>
               </div>
             </div>
-          </div>
-        </Card>
+          </Card>
+
+          {/* Interview Details - Right Side */}
+          <Card className="order-1 p-6 lg:order-1">
+            <div className="space-y-4">
+              <h2 className="mb-4 text-xl font-semibold text-transparent bg-gradient-to-r from-primary to-purple-500 bg-clip-text">
+                Interview Details
+              </h2>
+              <div className="space-y-4">
+                <div className="p-4 border rounded-lg bg-muted/5">
+                  <div className="space-y-3">
+                    <div>
+                      <span className="text-sm font-medium text-muted-foreground">Title:</span>
+                      <p className="text-lg font-semibold">{interviewData?.title}</p>
+                    </div>
+                    <div>
+                      <span className="text-sm font-medium text-muted-foreground">Job Role:</span>
+                      <p className="text-lg font-semibold text-primary">{interviewData?.jobRole}</p>
+                    </div>
+                    <div>
+                      <span className="text-sm font-medium text-muted-foreground">Experience Level:</span>
+                      <p className="text-lg font-semibold">{interviewData?.yearsOfExperience}</p>
+                    </div>
+                    <div>
+                      <span className="text-sm font-medium text-muted-foreground">Interview Purpose:</span>
+                      <p className="text-lg font-semibold">
+                        {interviewData?.reasonForInterview === 'new-job' && 'Looking for a new job'}
+                        {interviewData?.reasonForInterview === 'practice' && 'General practice'}
+                        {interviewData?.reasonForInterview === 'upcoming' && 'Preparing for upcoming interview'}
+                        {interviewData?.reasonForInterview === 'skills' && 'Improving interview skills'}
+                        {interviewData?.reasonForInterview === 'career-switch' && 'Switching career paths'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div className="p-4 border rounded-lg bg-primary/5">
+                  <h3 className="mb-2 text-sm font-medium">What to expect:</h3>
+                  <ul className="space-y-2 text-sm text-muted-foreground">
+                    <li>• 5 technical questions based on your experience level</li>
+                    <li>• Real-time feedback on your responses</li>
+                    <li>• Performance analysis after completion</li>
+                    <li>• Suggestions for improvement</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </Card>
+        </div>
       </motion.div>
     </div>
   );

@@ -81,6 +81,8 @@ export default function NewInterviewModal({ isOpen, onClose }: NewInterviewModal
     onClose();
   };
 
+  
+
   return (
     <AnimatePresence>
       {isOpen && (
