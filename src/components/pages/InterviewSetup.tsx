@@ -265,7 +265,7 @@ export default function InterviewSetup() {
                     </div>
                   </div>
                 </div>
-                <div className="p-4 border rounded-lg bg-primary/5">
+                <div className="p-4 border border-purple-500 rounded-lg bg-primary/5">
                   <h3 className="mb-2 text-sm font-medium">What to expect:</h3>
                   <ul className="space-y-2 text-sm text-muted-foreground">
                     <li>• 5 technical questions based on your experience level</li>
